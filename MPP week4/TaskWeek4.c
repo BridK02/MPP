@@ -1,16 +1,16 @@
-'''Create structs to represent...
-• An employee (name, age, salary, years worked, job title)
-• A college module (module name, credits it is worth)
-• Student (name, age, an array of their college modules)
-• Manager (name, age, salary, an array of the employees they manage)
-The student structure should have internally an array of college modules. The same goes for the manager and
-their employees. In Listing 2 we have a partial solution for some of the above tasks. We have a Student structure
-which holds an array of 10 modules, this means that each student we create can have 10 modules. We add two
-modules to the student struct and we print them out. You can expand on this to add all the other information
-specified above such as name and age. It would be useful to keep track of how many modules have been added to
-each student, so that we know what index to place the next one. This can be done by storing an integer in the
-struct to keep track.
-For each struct type create a print method which outputs to the console all the information stored in the struct.'''
+//Create structs to represent...
+//• An employee (name, age, salary, years worked, job title)
+//• A college module (module name, credits it is worth)
+//• Student (name, age, an array of their college modules)
+//• Manager (name, age, salary, an array of the employees they manage)
+//The student structure should have internally an array of college modules. The same goes for the manager and
+//their employees. In Listing 2 we have a partial solution for some of the above tasks. We have a Student structure
+//which holds an array of 10 modules, this means that each student we create can have 10 modules. We add two
+//modules to the student struct and we print them out. You can expand on this to add all the other information
+//specified above such as name and age. It would be useful to keep track of how many modules have been added to
+//each student, so that we know what index to place the next one. This can be done by storing an integer in the
+//struct to keep track.
+//For each struct type create a print method which outputs to the console all the information stored in the struct.
 
 #include <stdio.h>
 #include <string.h>
