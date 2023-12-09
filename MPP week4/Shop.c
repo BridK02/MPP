@@ -88,7 +88,6 @@ void printCustomer(struct Customer c)
 
 struct Shop createAndStockShop()
 {
-	struct Shop shop = { 200 };
     FILE * fp;
     char * line = NULL;
     size_t len = 0;
@@ -98,58 +97,34 @@ struct Shop createAndStockShop()
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
+    // Read the initial cash value from the "stock.csv" file
+    read = getline(&line, &len, fp);
+    if (read == -1)
+        exit(EXIT_FAILURE);
+
+    struct Shop shop = { .cash = atof(line) };
+
+    // Rest of the code for reading stock details
     while ((read = getline(&line, &len, fp)) != -1) {
-        // printf("Retrieved line of length %zu:\n", read);
-        // printf("%s IS A LINE", line);
-		char *n = strtok(line, ",");
-		char *p = strtok(NULL, ",");
-		char *q = strtok(NULL, ",");
-		int quantity = atoi(q);
-		double price = atof(p);
-		char *name = malloc(sizeof(char) * 50);
-		strcpy(name, n);
-		struct Product product = { name, price };
-		struct ProductStock stockItem = { product, quantity };
-		shop.stock[shop.index++] = stockItem;
-		// printf("NAME OF PRODUCT %s PRICE %.2f QUANTITY %d\n", name, price, quantity);
+        char *n = strtok(line, ",");
+        char *p = strtok(NULL, ",");
+        char *q = strtok(NULL, ",");
+        int quantity = atoi(q);
+        double price = atof(p);
+        char *name = malloc(sizeof(char) * 50);
+        strcpy(name, n);
+        struct Product product = { name, price };
+        struct ProductStock stockItem = { product, quantity };
+        shop.stock[shop.index++] = stockItem;
     }
-	
-	return shop;
+
+    fclose(fp);
+    if (line)
+        free(line);
+
+    return shop;
 }
 
-void processOrder(struct Shop *shop, struct Customer *customer)
-{
-  for (int i = 0; i < customer->index; i++)
-  {
-    struct ProductStock orderItem = customer->shoppingList[i];
-    struct ProductStock *shopItem = NULL;
-
-    // Find the corresponding product in the shop
-    for (int j = 0; j < shop->index; j++)
-    {
-      if (strcmp(orderItem.product.code, shop->stock[j].product.code) == 0)
-      {
-        shopItem = &(shop->stock[j]);
-        break;
-      }
-    }
-
-    // Check if the shop can fill the order
-    if (shopItem == NULL || shopItem->quantity < orderItem.quantity)
-    {
-      printf("Error: Unable to fill order for %s\n", orderItem.product.name);
-    }
-    else
-    {
-      // Update the shop's cash and stock
-      double cost = orderItem.quantity * orderItem.product.price;
-      shop->cash += cost;
-      shopItem->quantity -= orderItem.quantity;
-
-      printf("Order for %s processed. Cost: %.2f\n", orderItem.product.name, cost);
-    }
-  }
-}
 
 
 void printShop(struct Shop s)
@@ -183,7 +158,7 @@ void readCustomerOrders(struct Customer *customer, const char *filename)
     char *name = malloc(sizeof(char) * 50);
     strcpy(name, n);
 
-    struct Product product = { NULL, name, 0.0 }; // The product code is not specified in the customer file
+    struct Product product = {name, 0.0 }; // The product code is not specified in the customer file
     struct ProductStock stockItem = { product, quantity };
     customer->shoppingList[customer->index++] = stockItem;
   }
@@ -193,17 +168,22 @@ void readCustomerOrders(struct Customer *customer, const char *filename)
     free(line);
 }
 
+// Function prototype
+//void processOrder(struct Shop *shop, struct Customer *customer);
+
 int main(void)
 {
-  struct Shop shop = createAndStockShop();
-  printShop(shop);
+    struct Shop shop = createAndStockShop();
+    printShop(shop);
 
-  struct Customer dominic = {"Dominic", 100.0};
-  readCustomerOrders(&dominic, "customer.csv");
-  printCustomer(dominic);
+    struct Customer dominic = {"Dominic", 100.0};
+    readCustomerOrders(&dominic, "customer.csv");
+    printCustomer(dominic);
 
-  processOrder(&shop, &dominic);
-  printShop(shop);
+    // Call to the processOrder function
+    // processOrder(&shop, &dominic);
 
-  return 0;
+    printShop(shop);
+
+    return 0;
 }
