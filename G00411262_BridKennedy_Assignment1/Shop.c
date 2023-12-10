@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <string.h> 
 #include "HTUtils.h"
+#include <unistd.h> 
 
 
 /* Read up to (and including) a newline from STREAM into *LINEPTR
@@ -51,57 +52,102 @@ unsigned int len;
    return(len);
 }
 
-
-ssize_t custom_getline(char **ptr, size_t *n, FILE *stream) {
-    size_t size = *n;
-    char *line = *ptr;
-
-    if (line == NULL) {
-        line = malloc(size);
-        if (line == NULL) {
-            return -1; // Error in allocation
-        }
-    }
-
-    if (fgets(line, size, stream) == NULL) {
-        free(line);
-        return -1; // No more lines to read or error
-    }
-
-    size_t len = strlen(line);
-
-    if (len > 0 && line[len - 1] == '\n') {
-        line[len - 1] = '\0'; // Remove newline if present
-    }
-
-    *ptr = line;
-    *n = size;
-
-    return len; // Number of characters read
-}
-
 struct Product {
-    char *name;
-    double price;
+  char *name;
+  double price;
+  char *productCode; 
+};
+
+struct OrderItem {
+  char *productName;
+  int quantity;
 };
 
 struct ProductStock {
     struct Product product;
     int quantity;
+    int index; 
 };
 
 struct Shop {
     double cash;
-    struct ProductStock stock[20];
+    struct ProductStock stock[100];
     int index;
 };
 
 struct Customer {
     char *name;
     double budget;
-    struct ProductStock shoppingList[10];
+    struct ProductStock shoppingList[100];
     int index;
 };
+
+ssize_t custom_getline(char **ptr, size_t *n, FILE *stream) {
+  size_t size = *n;
+  char *line = *ptr;
+
+  if (line == NULL) {
+    line = malloc(size);
+    if (line == NULL) {
+      return -1; // Error in allocation
+    }
+  }
+
+  if (fgets(line, size, stream) == NULL) {
+    if (line[0] != '\0') {
+      // Free the partially allocated line
+      free(line);
+    }
+    return -1; // No more lines to read or error
+  }
+
+  size_t len = strlen(line);
+
+  if (len > 0 && line[len - 1] == '\n') {
+    line[len - 1] = '\0'; // Remove newline if present
+  }
+
+  if (line[0] == ',' || line[0] == '0') {
+    // Skip the first line (cash amount) if it's an empty or invalid cash amount
+    free(line);
+    line = NULL;
+    size = 0;
+  } else {
+    // Check if the first line is a valid cash amount
+    char *temp = strdup(line);
+    if (strlen(temp) < 10) {
+      free(temp);
+      fprintf(stderr, "Error: Invalid cash amount in stock.csv\n");
+      free(line);
+      return -1;
+    }
+
+    // Convert the temporary buffer to a double value
+    double cashAmount = atof(temp);
+
+    if (cashAmount == 0.0) {
+      // Handle any invalid cash amount
+      fprintf(stderr, "Error: Invalid cash amount in stock.csv\n");
+      free(temp);
+      free(line);
+      return -1;
+    }
+
+    struct Shop shop = {0.0};
+    shop.cash = cashAmount;
+    printf("Read cash amount: %.2f\n", shop.cash);
+
+    // Free the temporary buffer
+    free(temp);
+  }
+
+  *ptr = line;
+  *n = size;
+
+  return len; // Number of characters read
+}
+
+
 
 void printProduct(struct Product p) {
     printf("PRODUCT NAME: %s \nPRODUCT PRICE: %.2f\n", p.name, p.price);
@@ -119,50 +165,46 @@ void printCustomer(struct Customer c) {
     }
 }
 struct Shop createAndStockShop() {
-    struct Shop shop = {0.0};
+    FILE *fp;
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
 
-    FILE *fp = fopen("stock.csv", "r");
+    fp = fopen("C:/Users/bridc/repo/MultiParadigmProgramming/MPP/G00411262_BridKennedy_Assignment1/stock.csv", "r");
     if (fp == NULL) {
-        printf("Error: Unable to open stock file (fopen failed)\n");
+        fprintf(stderr, "Error: Unable to open stock file\n");
         exit(EXIT_FAILURE);
     }
 
-    char *line = NULL;
-    size_t lineLen = 0;
-    ssize_t read;
+    read = getline(&line, &len, fp);
+    float cash = atof(line);
+    printf("Cash in shop is %.2f\n", cash);
 
-    // Print a debug statement to verify that the function is being called
-    printf("Reading from stock.csv...\n");
+    struct Shop shop = {cash};
 
-    while ((read = custom_getline(&line, &lineLen, fp)) != -1) {
-        char *name = strtok(line, ",");
-        char *price_str = strtok(NULL, ",");
-        char *quantity_str = strtok(NULL, ",");
-
-        if (name != NULL && price_str != NULL && quantity_str != NULL) {
-            double price = atof(price_str);
-            int quantity = atoi(quantity_str);
-
-            struct Product product = {strdup(name), price};
-            struct ProductStock stockItem = {product, quantity};
-            shop.stock[shop.index++] = stockItem;
-
-            // Print the product details
-            printf("Read: %s, %.2f, %d\n", name, price, quantity);
-        } else {
-            printf("Error reading line: %s\n", line);
-            printf("Tokens: %s, %s, %s\n", name, price_str, quantity_str);
+    while ((read = getline(&line, &len, fp)) != -1) {
+        char *n = strtok(line, ",");
+        char *p = strtok(NULL, ",");
+        char *q = strtok(NULL, ",");
+        int quantity = atoi(q);
+        double price = atof(p);
+        char *name = malloc(sizeof(char) * 50);
+        if (name == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed\n");
+            exit(EXIT_FAILURE);
         }
+        strcpy(name, n);
+        struct Product product = {name, price};
+        struct ProductStock stockItem = {product, quantity};
+        shop.stock[shop.index++] = stockItem;
+        printf("Name: %s, Price: %.2f, Quantity: %d\n", name, price, quantity);
     }
 
-    // Print a debug statement to verify that the loop has ended
-    printf("Finished reading from stock.csv\n");
-
+    free(line);
     fclose(fp);
 
     return shop;
 }
-
 
 
 void readCustomerOrders(struct Customer *customer, const char *filename) {
@@ -174,12 +216,14 @@ void readCustomerOrders(struct Customer *customer, const char *filename) {
 
     printf("Reading from %s...\n", filename);
 
+    // Initialize the index member of the customer
+    customer->index = 0;
+
     char *line = NULL;
     size_t len = 0;
 
     while (getline(&line, &len, fp) != -1) {
         char *n = strtok(line, ",");
-        char *p = strtok(NULL, ",");
         int quantity = atoi(strtok(NULL, ","));
 
         char *name = malloc(sizeof(char) * 50);
@@ -199,6 +243,7 @@ void readCustomerOrders(struct Customer *customer, const char *filename) {
 
     printf("Finished reading from %s\n", filename);
 }
+
 
 
 void processOrder(struct Shop *shop, struct Customer *customer) {
@@ -274,15 +319,16 @@ void printShopToFile(struct Shop s, const char *filename) {
 }
 
 int main(void) {
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        fprintf(stderr, "Current working directory: %s\n", cwd);
+    } else {
+        perror("getcwd() error");
+        return EXIT_FAILURE;
+    }
+
     struct Shop shop = createAndStockShop();
     printShopToFile(shop, "shop_details.txt");
 
-    struct Customer john;
-    readCustomerOrders(&john, "customer_positive.csv");
-    printCustomer(john);
-
-    processOrder(&shop, &john);
-    printShop(shop);
-
-    return 0;
+     return 0;
 }
