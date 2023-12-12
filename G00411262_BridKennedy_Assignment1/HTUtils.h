@@ -131,7 +131,7 @@
 /* #define BAD(status)  (!GOOD(status))	 Bit 0 set if OK, otherwise clear   */
 
 #ifndef BOOLEAN_DEFINED
-	typedef char	BOOLEAN;		/* Logical value */
+typedef unsigned char BOOLEAN; 
 #ifndef CURSES
 #ifndef TRUE
 #define TRUE	(BOOLEAN)1

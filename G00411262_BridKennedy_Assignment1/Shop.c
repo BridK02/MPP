@@ -2,9 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <string.h> 
+#include <string.h>
 #include "HTUtils.h"
-#include <unistd.h> 
+#include <unistd.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+#else
+#include <sys/sysinfo.h>
+#endif
 
 
 /* Read up to (and including) a newline from STREAM into *LINEPTR
@@ -82,7 +89,7 @@ struct Customer {
     int index;
 };
 
-ssize_t custom_getline(char **ptr, size_t *n, FILE *stream) {
+ssize_t custom_getline(char **ptr, size_t *n, FILE *stream, int skipFirstLine) {
   size_t size = *n;
   char *line = *ptr;
 
@@ -91,6 +98,14 @@ ssize_t custom_getline(char **ptr, size_t *n, FILE *stream) {
     if (line == NULL) {
       return -1; // Error in allocation
     }
+  }
+
+  // Skip the first line if specified
+  if (skipFirstLine) {
+    skipFirstLine = 0;
+    free(line);
+    line = NULL;
+    size = 0;
   }
 
   if (fgets(line, size, stream) == NULL) {
@@ -107,46 +122,12 @@ ssize_t custom_getline(char **ptr, size_t *n, FILE *stream) {
     line[len - 1] = '\0'; // Remove newline if present
   }
 
-  if (line[0] == ',' || line[0] == '0') {
-    // Skip the first line (cash amount) if it's an empty or invalid cash amount
-    free(line);
-    line = NULL;
-    size = 0;
-  } else {
-    // Check if the first line is a valid cash amount
-    char *temp = strdup(line);
-    if (strlen(temp) < 10) {
-      free(temp);
-      fprintf(stderr, "Error: Invalid cash amount in stock.csv\n");
-      free(line);
-      return -1;
-    }
-
-    // Convert the temporary buffer to a double value
-    double cashAmount = atof(temp);
-
-    if (cashAmount == 0.0) {
-      // Handle any invalid cash amount
-      fprintf(stderr, "Error: Invalid cash amount in stock.csv\n");
-      free(temp);
-      free(line);
-      return -1;
-    }
-
-    struct Shop shop = {0.0};
-    shop.cash = cashAmount;
-    printf("Read cash amount: %.2f\n", shop.cash);
-
-    // Free the temporary buffer
-    free(temp);
-  }
-
   *ptr = line;
   *n = size;
 
   return len; // Number of characters read
+  printf("custom_getline: Read %zd characters: %s\n", len, line);
 }
-
 
 
 void printProduct(struct Product p) {
@@ -155,15 +136,16 @@ void printProduct(struct Product p) {
 }
 
 void printCustomer(struct Customer c) {
-    printf("CUSTOMER NAME: %s \nCUSTOMER BUDGET: %.2f\n", c.name, c.budget);
+    printf("CUSTOMER NAME: %s \nCUSTOMER BUDGET: %.2f\n", c.name, c.shoppingList[0].product.price);
     printf("-------------\n");
-    for (int i = 0; i < c.index; i++) {
+    for (int i = 1; i < c.index; i++) {
         printProduct(c.shoppingList[i].product);
         printf("%s ORDERS %d OF ABOVE PRODUCT\n", c.name, c.shoppingList[i].quantity);
         double cost = c.shoppingList[i].quantity * c.shoppingList[i].product.price;
         printf("The cost to %s will be %.2f\n", c.name, cost);
     }
 }
+
 struct Shop createAndStockShop() {
     FILE *fp;
     char *line = NULL;
@@ -206,35 +188,83 @@ struct Shop createAndStockShop() {
     return shop;
 }
 
+void processOrder(struct Shop *shop, struct Customer *customer) {
+    for (int i = 0; i < customer->index; i++) {
+        struct ProductStock orderItem = customer->shoppingList[i];
+        struct ProductStock *shopItem = NULL;
 
+        // Find the corresponding product in the shop (case-insensitive comparison)
+        for (int j = 0; j < shop->index; j++) {
+#ifdef _WIN32
+            if (_stricmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
+#else
+            if (strcasecmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
+#endif
+                shopItem = &(shop->stock[j]);
+                break;
+            }
+        }
+
+        // Check if the shop can fill the order
+        if (shopItem == NULL || shopItem->quantity < orderItem.quantity) {
+            printf("Error: Insufficient stock for %s. Available: %d, Ordered: %d\n",
+                    orderItem.product.name, shopItem ? shopItem->quantity : 0, orderItem.quantity);
+        } else {
+            // Update the shop's cash and stock
+            double cost = orderItem.quantity * orderItem.product.price;
+            shop->cash += cost;
+            shopItem->quantity -= orderItem.quantity;
+
+            printf("Order for %s processed. Cost: %.2f\n", orderItem.product.name, cost);
+            printf("Updated shop cash: %.2f\n", shop->cash);
+            printf("Updated stock for %s: %d\n", orderItem.product.name, shopItem->quantity);
+        }
+    }
+}
+
+ // Function to get available system memory (cross-platform)
+int getFreeMemory() {
+    int freeMemory = 0;
+
+#ifdef _WIN32
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    GlobalMemoryStatusEx(&memInfo);
+    freeMemory = (int)(memInfo.ullAvailPhys / (1024 * 1024));  // Convert to megabytes
+#else
+    struct sysinfo info;
+    sysinfo(&info);
+    freeMemory = (int)(info.freeram / (1024 * 1024));  // Convert to megabytes
+#endif
+
+    return freeMemory;
+}
+ 
 void readCustomerOrders(struct Customer *customer, const char *filename) {
-    FILE *fp = fopen(filename, "r");
+    FILE *fp;
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    fp = fopen(filename, "r");
     if (fp == NULL) {
-        printf("Error: Unable to open customer file %s\n", filename);
+        fprintf(stderr, "Error: Unable to open customer file %s\n", filename);
         exit(EXIT_FAILURE);
     }
 
-    printf("Reading from %s...\n", filename);
+    read = getline(&line, &len, fp); // Skip the header line
 
-    // Initialize the index member of the customer
-    customer->index = 0;
-
-    char *line = NULL;
-    size_t len = 0;
-
+    // Process the remaining lines
     while (getline(&line, &len, fp) != -1) {
-        char *n = strtok(line, ",");
+        char *productName = strtok(line, ",");
         int quantity = atoi(strtok(NULL, ","));
 
-        char *name = malloc(sizeof(char) * 50);
-        strcpy(name, n);
-
-        struct Product product = {name, 0.0}; // The product code is not specified in the customer file
+        struct Product product = {strdup(productName), 0.0}; // The product code is not specified in the customer file
         struct ProductStock stockItem = {product, quantity};
         customer->shoppingList[customer->index++] = stockItem;
 
         // Print details of the order being read
-        printf("Order: %s, Quantity: %d\n", name, quantity);
+        printf("Order: %s, Quantity: %d\n", productName, quantity);
     }
 
     fclose(fp);
@@ -244,34 +274,6 @@ void readCustomerOrders(struct Customer *customer, const char *filename) {
     printf("Finished reading from %s\n", filename);
 }
 
-
-
-void processOrder(struct Shop *shop, struct Customer *customer) {
-    for (int i = 0; i < customer->index; i++) {
-        struct ProductStock orderItem = customer->shoppingList[i];
-        struct ProductStock *shopItem = NULL;
-
-        // Find the corresponding product in the shop
-        for (int j = 0; j < shop->index; j++) {
-            if (strcmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
-                shopItem = &(shop->stock[j]);
-                break;
-            }
-        }
-
-        // Check if the shop can fill the order
-        if (shopItem == NULL || shopItem->quantity < orderItem.quantity) {
-            printf("Error: Unable to fill order for %s\n", orderItem.product.name);
-        } else {
-            // Update the shop's cash and stock
-            double cost = orderItem.quantity * orderItem.product.price;
-            shop->cash += cost;
-            shopItem->quantity -= orderItem.quantity;
-
-            printf("Order for %s processed. Cost: %.2f\n", orderItem.product.name, cost);
-        }
-    }
-}
 
 
 void printShop(struct Shop s) {
@@ -329,6 +331,16 @@ int main(void) {
 
     struct Shop shop = createAndStockShop();
     printShopToFile(shop, "shop_details.txt");
+
+    struct Customer emer;
+    readCustomerOrders(&emer, "customer_negative.csv");
+    printCustomer(emer);
+
+    // Add a debug print here to check if the program reaches this point
+    printf("main: Finished processing customer orders\n");
+
+    processOrder(&shop, &emer);
+    printShop(shop);
 
      return 0;
 }
