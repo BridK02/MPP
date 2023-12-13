@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List
 from decimal import Decimal
-from typing import Union  # Import Union directly
+from typing import Union  
 import csv
 
 @dataclass
@@ -44,7 +44,7 @@ def create_and_stock_shop():
                 price = Decimal(row[1])  # Use Decimal for precision
                 quantity = int(row[2])
 
-                print(f"Read product: {product_name}")
+                #print(f"Read product: {product_name}")
                 
                 product = Product(product_name, price)
                 product_stock = ProductStock(product, quantity)
@@ -54,9 +54,9 @@ def create_and_stock_shop():
         shop = Shop(cash, stock)
 
         # Print all items in the stock
-        print("All items in stock:")
-        for product_stock in shop.stock:
-            print(f"Product: {product_stock.product.name}, Price: {product_stock.product.price}, Quantity: {product_stock.quantity}")
+        #print("All items in stock:")
+        #for product_stock in shop.stock:
+           # print(f"Product: {product_stock.product.name}, Price: {product_stock.product.price}, Quantity: {product_stock.quantity}")
 
         return shop
 
@@ -115,25 +115,31 @@ def process_order(shop, customer):
         quantity = int(order[1])
 
         # Check if the product is in stock
-        if any(ps.product.name == product_name for ps in shop.stock):
-            # Process the customer's request
-            print(f"Processing customer '{customer.name}' request for {quantity} units of '{product_name}'.")
-            
-            # Deduct the purchased quantity from the stock
-            for ps in shop.stock:
-                if ps.product.name == product_name:
-                    ps.quantity -= quantity
+        product_in_stock = next((ps for ps in shop.stock if ps.product.name == product_name), None)
+        if product_in_stock is None or product_in_stock.quantity < quantity:
+            print(f"Error: Not enough stock for {quantity} units of '{product_name}'. Order not completed.")
+            continue
 
-            # Calculate the total cost of the purchase
-            product_price = next(ps.product.price for ps in shop.stock if ps.product.name == product_name)
-            total_cost = quantity * product_price
+        # Check if the customer has enough budget
+        product_price = float(product_in_stock.product.price)
+        total_cost = quantity * product_price
+        if total_cost > float(customer.budget):
+            print(f"Error: Not enough budget for {quantity} units of '{product_name}'. Order not completed.")
+            continue
 
-            # Update the shop's cash balance based on the purchase
-            shop.cash -= total_cost
-            print(f"Customer '{customer.name}' spent {total_cost:.2f}. Shop budget remaining: {shop.cash:.2f}")
+        # Process the customer's request
+        print(f"Processing customer '{customer.name}' request for {quantity} units of '{product_name}'.")
+        
+        # Deduct the purchased quantity from the stock
+        product_in_stock.quantity -= quantity
 
-        else:
-            print(f"Error: Product '{product_name}' not found in stock.")
+        # Calculate the total cost of the purchase
+        total_cost = quantity * product_price
+
+        # Update the shop's cash balance based on the purchase
+        shop.cash += total_cost
+        print(f"Customer '{customer.name}' spent {total_cost:.2f}. Customer budget remaining: {float(customer.budget) - total_cost:.2f}")
+        print(f"Shop's budget increased by {total_cost:.2f}. Shop budget now: {shop.cash:.2f}")
 
 def live_mode(shop: Shop):
     while True:
@@ -142,19 +148,19 @@ def live_mode(shop: Shop):
             break
 
         try:
-            quantity = float(input(f"Enter quantity of {product_name}: "))
+            quantity = Decimal(input(f"Enter quantity of {product_name}: "))
             product_in_stock = next((item for item in shop.stock if item.product.name == product_name), None)
 
             if product_in_stock is None or product_in_stock.quantity < quantity:
                 print(f"Sorry, the shop does not have enough stock for {quantity} units of {product_name}")
                 continue
 
-            cost = quantity * product_in_stock.product.price
+            cost = Decimal(quantity) * product_in_stock.product.price
             print(f'The cost for {quantity} units of {product_name} is €{cost:.2f}')
 
             confirm = input("Do you want to buy this? (yes/no): ")
             if confirm.lower() == 'yes':
-                shop.cash += cost
+                shop.cash += float(cost)  # Convert cost to float before adding
                 product_in_stock.quantity -= quantity
                 print(f"Purchase successful! Shop's cash: €{shop.cash:.2f}, {product_name} in stock: {product_in_stock.quantity}")
             else:
@@ -165,7 +171,13 @@ def live_mode(shop: Shop):
 
 # Usage
 shop = create_and_stock_shop()
-customer = read_customer("stock.csv", "customer.csv")
+#customer = read_customer("stock.csv", "customer.csv")
+#customer = read_customer("stock.csv", "customer_positive.csv")
+#customer = read_customer("stock.csv", "customer_negative.csv")
+#customer = read_customer("stock.csv", "customer_insufficientbudget.csv")
+
+# Create a dummy customer for live mode
+customer = Customer("LiveModeCustomer", 100.0, [])
 
 try:
     process_order(shop, customer)
@@ -174,5 +186,7 @@ try:
 except ValueError as e:
     print(f"Error processing order: {e}")
 
+
+
 # Uncomment the following line to test live mode
-# live_mode(shop)
+live_mode(shop)
