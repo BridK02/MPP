@@ -5,6 +5,8 @@
 #include <string.h>
 #include "HTUtils.h"
 #include <unistd.h>
+#include <ctype.h>
+#include <wchar.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -222,6 +224,7 @@ void processOrder(struct Shop *shop, struct Customer *customer) {
     }
 }
 
+
  // Function to get available system memory (cross-platform)
 int getFreeMemory() {
     int freeMemory = 0;
@@ -320,6 +323,115 @@ void printShopToFile(struct Shop s, const char *filename) {
     fclose(file);
 }
 
+void lowercaseString(char *str) {
+    for (int i = 0; str[i]; i++) {
+        str[i] = tolower((unsigned char)str[i]);
+    }
+}
+
+// Function to read a line from the standard input
+char *readLine() {
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    // Read the line
+    if ((read = getline(&line, &len, stdin)) != -1) {
+        // Remove newline character, if present
+        if (line[read - 1] == '\n') {
+            line[read - 1] = '\0';
+        }
+        return line;
+    } else {
+        free(line);
+        return NULL;
+    }
+}
+
+void liveMode(struct Shop *shop) {
+  char productName[50];
+  int quantity;
+
+  while (1) {
+    printf("Enter product name (or 'exit' to end): ");
+
+    // Read the line and trim leading/trailing whitespaces
+    char *input = readLine();
+    if (input == NULL) {
+      printf("Error reading input. Exiting live mode.\n");
+      break;
+    }
+
+    // Convert the input to lowercase
+    for (int i = 0; input[i]; i++) {
+      input[i] = tolower((unsigned char)input[i]);
+    }
+
+    if (strcmp(input, "exit") == 0) {
+      free(input);
+      break;
+    }
+
+    strcpy(productName, input);
+    free(input);
+
+    printf("Enter quantity of %s: ", productName);
+    scanf("%d", &quantity);
+
+    // Find the corresponding product in the shop (case-insensitive comparison)
+    struct ProductStock *shopItem = NULL;
+    for (int j = 0; j < shop->index; j++) {
+      char stockProductName[50];
+      strcpy(stockProductName, shop->stock[j].product.name);
+
+      // Convert the stock product name to lowercase
+      for (int i = 0; stockProductName[i]; i++) {
+        stockProductName[i] = tolower((unsigned char)stockProductName[i]);
+      }
+
+      if (strcmp(productName, stockProductName) == 0) {
+        shopItem = &(shop->stock[j]);
+        break;
+      }
+    }
+
+    if (shopItem == NULL) {
+      printf("Sorry, the shop does not have this product in stock\n");
+    } else {
+      // Check if the stock is sufficient
+      if (quantity > shopItem->quantity) {
+        printf("Sorry, the shop does not have enough stock for %d units of %s\n", quantity, productName);
+      } else {
+        // Calculate the cost of the order
+        double cost = quantity * shopItem->product.price;
+
+        printf("The cost for %d units of %s is %.2f EUR\n", quantity, productName, cost);
+
+
+
+        printf("Do you want to buy this? (yes/no): ");
+        char confirm[3];
+        scanf("%s", confirm);
+
+        if (strcasecmp(confirm, "yes") == 0) {
+          // Update the shop's cash and stock
+          shop->cash += cost;
+          shopItem->quantity -= quantity;
+
+          printf("Purchase successful! Shop's cash: %.2f EUR, %s in stock: %d\n", shop->cash, productName, shopItem->quantity);
+        } else {
+          printf("Purchase canceled.\n");
+        }
+      }
+    }
+  }
+}
+
+
+
+
+
+
 int main(void) {
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -332,15 +444,17 @@ int main(void) {
     struct Shop shop = createAndStockShop();
     printShopToFile(shop, "shop_details.txt");
 
-    struct Customer emer;
-    readCustomerOrders(&emer, "customer_negative.csv");
-    printCustomer(emer);
+    //struct Customer emer;
+    //readCustomerOrders(&emer, "customer_negative.csv");
+    //printCustomer(emer);
 
     // Add a debug print here to check if the program reaches this point
-    printf("main: Finished processing customer orders\n");
+    //printf("main: Finished processing customer orders\n");
 
-    processOrder(&shop, &emer);
-    printShop(shop);
+    //processOrder(&shop, &emer);
+    //printShop(shop);
+
+    liveMode(&shop);
 
      return 0;
 }

@@ -1,1 +1,6 @@
 Shop has 1000.30 in cash
+Product: Coke Can, Price: 1.10, Quantity: 100
+Product: Bread, Price: 0.70, Quantity: 30
+Product: Spaghetti, Price: 1.20, Quantity: 100
+Product: Tomato Sauce, Price: 0.80, Quantity: 100
+Product: Big Bags, Price: 2.50, Quantity: 4
