@@ -100,7 +100,7 @@ def print_customer(customer):
         print(f'The cost to {customer.name} will be €{cost:.2f}')
 
 def print_shop(shop):
-    print(f'Shop has {shop.cash} in cash')
+    print(f'Shop has {shop.cash:.2f} in cash')
     for item in shop.stock:
         print_product(item.product)
         print(f'The Shop has {item.quantity} of the above')
@@ -174,10 +174,10 @@ shop = create_and_stock_shop()
 #customer = read_customer("stock.csv", "customer.csv")
 #customer = read_customer("stock.csv", "customer_positive.csv")
 #customer = read_customer("stock.csv", "customer_negative.csv")
-#customer = read_customer("stock.csv", "customer_insufficientbudget.csv")
+customer = read_customer("stock.csv", "customer_insufficientbudget.csv")
 
 # Create a dummy customer for live mode
-customer = Customer("LiveModeCustomer", 100.0, [])
+#customer = Customer("LiveModeCustomer", 100.0, [])
 
 try:
     process_order(shop, customer)
@@ -189,4 +189,4 @@ except ValueError as e:
 
 
 # Uncomment the following line to test live mode
-live_mode(shop)
+#live_mode(shop)

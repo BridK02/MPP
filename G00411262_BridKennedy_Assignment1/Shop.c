@@ -418,7 +418,7 @@ void liveMode(struct Shop *shop) {
           shop->cash += cost;
           shopItem->quantity -= quantity;
 
-          printf("Purchase successful! Shop's cash: %.2f EUR, %s in stock: %d\n", shop->cash, productName, shopItem->quantity);
+          printf("Purchase successful! Shop's cash: %.2f EUR, %s in stock: %d\n", shop->cash, productName, shopItem->quantity);git push
         } else {
           printf("Purchase canceled.\n");
         }
