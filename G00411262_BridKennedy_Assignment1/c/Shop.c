@@ -162,7 +162,7 @@ struct Shop createAndStockShop() {
 
     read = getline(&line, &len, fp);
     float cash = atof(line);
-    printf("Cash in shop is %.2f\n", cash);
+    //printf("Cash in shop is %.2f\n", cash);
 
     struct Shop shop = {cash};
 
@@ -181,7 +181,7 @@ struct Shop createAndStockShop() {
         struct Product product = {name, price};
         struct ProductStock stockItem = {product, quantity};
         shop.stock[shop.index++] = stockItem;
-        printf("Name: %s, Price: %.2f, Quantity: %d\n", name, price, quantity);
+        //printf("Name: %s, Price: %.2f, Quantity: %d\n", name, price, quantity);
     }
 
     free(line);
@@ -197,15 +197,15 @@ void processOrder(struct Shop *shop, struct Customer *customer) {
 
         // Find the corresponding product in the shop (case-insensitive comparison)
         for (int j = 0; j < shop->index; j++) {
-#ifdef _WIN32
-            if (_stricmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
-#else
-            if (strcasecmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
-#endif
-                shopItem = &(shop->stock[j]);
-                break;
-            }
-        }
+        #ifdef _WIN32
+                    if (_stricmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
+        #else
+                    if (strcasecmp(orderItem.product.name, shop->stock[j].product.name) == 0) {
+        #endif
+                        shopItem = &(shop->stock[j]);
+                        break;
+                    }
+                }
 
         // Check if the shop can fill the order
         if (shopItem == NULL || shopItem->quantity < orderItem.quantity) {
@@ -348,83 +348,95 @@ char *readLine() {
     }
 }
 
+void clearInputBuffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
 void liveMode(struct Shop *shop) {
-  char productName[50];
-  int quantity;
+    char productName[50];
+    int quantity;
 
-  while (1) {
-    printf("Enter product name (or 'exit' to end): ");
+    while (1) {
+        printf("Enter product name (or 'exit' to end): ");
 
-    // Read the line and trim leading/trailing whitespaces
-    char *input = readLine();
-    if (input == NULL) {
-      printf("Error reading input. Exiting live mode.\n");
-      break;
-    }
-
-    // Convert the input to lowercase
-    for (int i = 0; input[i]; i++) {
-      input[i] = tolower((unsigned char)input[i]);
-    }
-
-    if (strcmp(input, "exit") == 0) {
-      free(input);
-      break;
-    }
-
-    strcpy(productName, input);
-    free(input);
-
-    printf("Enter quantity of %s: ", productName);
-    scanf("%d", &quantity);
-
-    // Find the corresponding product in the shop (case-insensitive comparison)
-    struct ProductStock *shopItem = NULL;
-    for (int j = 0; j < shop->index; j++) {
-      char stockProductName[50];
-      strcpy(stockProductName, shop->stock[j].product.name);
-
-      // Convert the stock product name to lowercase
-      for (int i = 0; stockProductName[i]; i++) {
-        stockProductName[i] = tolower((unsigned char)stockProductName[i]);
-      }
-
-      if (strcmp(productName, stockProductName) == 0) {
-        shopItem = &(shop->stock[j]);
-        break;
-      }
-    }
-
-    if (shopItem == NULL) {
-      printf("Sorry, the shop does not have this product in stock\n");
-    } else {
-      // Check if the stock is sufficient
-      if (quantity > shopItem->quantity) {
-        printf("Sorry, the shop does not have enough stock for %d units of %s\n", quantity, productName);
-      } else {
-        // Calculate the cost of the order
-        double cost = quantity * shopItem->product.price;
-
-        printf("The cost for %d units of %s is %.2f EUR\n", quantity, productName, cost);
-
-
-
-        printf("Do you want to buy this? (yes/no): ");
-        char confirm[3];
-        scanf("%s", confirm);
-
-        if (strcasecmp(confirm, "yes") == 0) {
-          // Update the shop's cash and stock
-          shop->cash += cost;
-          shopItem->quantity -= quantity;
-
-          printf("Purchase successful! Shop's cash: %.2f EUR, %s in stock: %d\n", shop->cash, productName, shopItem->quantity);git push
-        } else {
-          printf("Purchase canceled.\n");
+        // Read the line and trim leading/trailing whitespaces
+        char *input = readLine();
+        if (input == NULL) {
+            printf("Error reading input. Exiting live mode.\n");
+            break;
         }
-      }
+
+        // Convert the input to lowercase
+        for (int i = 0; input[i]; i++) {
+            input[i] = tolower((unsigned char)input[i]);
+        }
+
+        if (strcmp(input, "exit") == 0) {
+            free(input);
+            break; // Exit the loop if 'exit' is entered
+        }
+
+        strcpy(productName, input);
+        free(input);
+
+        printf("Enter quantity of %s: ", productName);
+        if (scanf("%d", &quantity) != 1) {
+            printf("Invalid quantity. Exiting live mode.\n");
+            break;
+        }
+
+        clearInputBuffer(); // Clear the input buffer after scanf
+
+        // Find the corresponding product in the shop (case-insensitive comparison)
+        struct ProductStock *shopItem = NULL;
+        for (int j = 0; j < shop->index; j++) {
+            char stockProductName[50];
+            strcpy(stockProductName, shop->stock[j].product.name);
+
+            // Convert the stock product name to lowercase
+            for (int i = 0; stockProductName[i]; i++) {
+                stockProductName[i] = tolower((unsigned char)stockProductName[i]);
+            }
+
+            if (strcmp(productName, stockProductName) == 0) {
+                shopItem = &(shop->stock[j]);
+                break;
+            }
+        }
+
+        if (shopItem == NULL) {
+            printf("Sorry, the shop does not have this product in stock\n");
+        } else {
+            // Check if the stock is sufficient
+            if (quantity > shopItem->quantity) {
+                printf("Sorry, the shop does not have enough stock for %d units of %s\n", quantity, productName);
+            } else {
+                // Calculate the cost of the order
+                double cost = quantity * shopItem->product.price;
+
+                printf("The cost for %d units of %s is %.2f EUR\n", quantity, productName, cost);
+
+                printf("Do you want to buy this? (yes/no): ");
+                char confirm[3];
+                if (scanf("%s", confirm) != 1) {
+                    printf("Invalid input. Exiting live mode.\n");
+                    break;
+                }
+
+                clearInputBuffer(); // Clear the input buffer after scanf
+
+                if (strcasecmp(confirm, "yes") == 0) {
+                    // Update the shop's cash and stock
+                    shop->cash += cost;
+                    shopItem->quantity -= quantity;
+
+                    printf("Purchase successful! Shop's cash: %.2f EUR, %s in stock: %d\n", shop->cash, productName, shopItem->quantity);
+                } else {
+                    printf("Purchase canceled.\n");
+                }
+            }
+        }
     }
-  }
 }
 
 
